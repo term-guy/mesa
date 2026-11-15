@@ -17,11 +17,11 @@
 /*
  * User-visible driver identity, reported in VkPhysicalDeviceDriverProperties
  * by every physical device this driver opens.  It does not depend on the chip,
- * so a newly enabled GPU reports it with no further change.  The driverID is
- * VK_DRIVER_ID_AURORA_BOREALIS, registered by Khronos for Aurora Silicon.
+ * so a newly enabled GPU reports it with no further change.  As upstream
+ * Mesa: driverID VK_DRIVER_ID_MESA_HONEYKRISP, name "Honeykrisp".
  */
-#define HK_DRIVER_NAME "Borealis"
-#define HK_DRIVER_INFO_SUFFIX ", Borealis, derived from Honeykrisp"
+#define HK_DRIVER_NAME "Honeykrisp"
+#define HK_DRIVER_INFO_SUFFIX ""
 
 struct hk_instance;
 struct hk_physical_device;
