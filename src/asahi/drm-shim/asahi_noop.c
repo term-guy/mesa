@@ -507,6 +507,46 @@ static const struct drm_asahi_params_global params_g18g = {
    .gpu_hal_generation = DRM_ASAHI_GPU_HAL_300,
 };
 
+/* Offline crash triage for J704 (M5, T8142): the G17G identity and the
+ * M5 command-set features the aurora kernel reports on J704 (GET_PARAMS
+ * features 0x3a7cfe7c06), minus the ones whose ioctls this shim does not
+ * emulate (VM status, independent queues, residency, userptr, compute
+ * timeout). Submissions are accepted and dropped: nothing executes, so
+ * only CPU-side crashes (compiler asserts, command building) reproduce.
+ * Select with ASAHI_SHIM_CHIP=g17g-j704. */
+static const struct drm_asahi_params_global params_g17g_j704 = {
+   .features = DRM_ASAHI_FEATURE_PER_COMMAND_INPUT_SYNCS |
+               DRM_ASAHI_FEATURE_EXACT_PRIOR_BARRIERS |
+               DRM_ASAHI_FEATURE_FRAGMENT_BARRIERS |
+               DRM_ASAHI_FEATURE_FEW_PRIMITIVES |
+               DRM_ASAHI_FEATURE_CUMULATIVE_SIGNALS |
+               DRM_ASAHI_FEATURE_RENDER_RESOURCES |
+               DRM_ASAHI_FEATURE_RENDER_RESOURCES_V2 |
+               DRM_ASAHI_FEATURE_COMPUTE_RESOURCES |
+               DRM_ASAHI_FEATURE_SPARSE_TILES |
+               DRM_ASAHI_FEATURE_COMPUTE_MATRIX |
+               DRM_ASAHI_FEATURE_RENDER_SHADER_WRITES |
+               DRM_ASAHI_FEATURE_WHOLE_ATTACHMENT_RENDERS |
+               DRM_ASAHI_FEATURE_TASK_MESH_STORAGE |
+               DRM_ASAHI_FEATURE_M5_DEPTH_MSAA_COMPRESSION |
+               DRM_ASAHI_FEATURE_M5_STENCIL_MSAA_COMPRESSION,
+   .gpu_generation = 17, .gpu_variant = 'G', .gpu_revision = 0x20,
+   .chip_id = 0x8142, .num_dies = 1, .num_clusters_total = 1,
+   .num_cores_per_cluster = 10, .core_masks = {0x3ff},
+   .vm_start = 0x4000, .vm_end = (1ull << 42) - 0x8000ull,
+   .vm_kernel_min_size = 0x20000000, .max_commands_per_submission = 64,
+   .max_attachments = 16, .max_frequency_khz = 1620000,
+   .command_timestamp_frequency_hz = 1000000000,
+   .usc_generation = 3, .gpu_hal_generation = DRM_ASAHI_GPU_HAL_300,
+};
+
+static bool
+g17g_j704(void)
+{
+   const char *chip = getenv("ASAHI_SHIM_CHIP");
+   return chip && !strcmp(chip, "g17g-j704");
+}
+
 static bool
 g17g_compile_only(void)
 {
@@ -543,6 +583,8 @@ shim_params(void)
       return &params_g16s;
    if (g17g_compile_only())
       return &params_g17g_compile_only;
+   if (chip && !strcmp(chip, "g17g-j704"))
+      return &params_g17g_j704;
 
    if (g18g_profile())
       return &params_g18g;
@@ -2044,6 +2086,9 @@ m5_submit_gate(const struct drm_asahi_submit *submit)
 static int
 asahi_ioctl_submit_unlocked(int fd, unsigned long request, void *arg)
 {
+   if (g17g_j704())
+      return 0;
+
    if (g17g_compile_only()) {
       fprintf(stderr, "shim: G17G compiler-only profile rejects GPU submission\n");
       errno = EOPNOTSUPP;
@@ -2294,7 +2339,7 @@ drm_shim_driver_init(void)
    const bool g15c = chip && !strcmp(chip, "g15c");
    const bool g16g = chip && !strcmp(chip, "g16g");
    /* ASAHI_SHIM_CHIP=g17g-compile-only and g18g. */
-   const bool g17g = g17g_compile_only();
+   const bool g17g = g17g_compile_only() || g17g_j704();
    const bool g18g = g18g_profile();
 
    drm_shim_override_file(g13x   ? "DRIVER=asahi\n"
